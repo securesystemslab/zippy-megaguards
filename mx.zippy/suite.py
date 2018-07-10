@@ -84,6 +84,7 @@ suite = {
                 "ASM",
                 "JAMM",
                 "JLINE09",
+                "megaguards:MEGAGUARDS",
                 ],
       "checkstyle" : "edu.uci.python",
       "javaCompliance" : "1.8",
@@ -127,6 +128,7 @@ suite = {
       "distDependencies" : [
         "truffle:TRUFFLE_API",
         "truffle:TRUFFLE_DSL_PROCESSOR",
+        "megaguards:MEGAGUARDS",
         ],
       "exclude" : [
         "ASM",

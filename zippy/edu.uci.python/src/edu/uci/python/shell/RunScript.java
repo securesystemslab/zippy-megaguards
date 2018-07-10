@@ -28,6 +28,12 @@ import java.io.OutputStream;
 
 import com.oracle.truffle.api.source.Source;
 
+import edu.uci.megaguards.MGOptions;
+import edu.uci.megaguards.analysis.parallel.profile.ParallelNodeProfile;
+import edu.uci.megaguards.backend.parallel.opencl.OpenCLExecuter;
+import edu.uci.megaguards.log.MGLog;
+import edu.uci.python.runtime.PythonOptions;
+
 public class RunScript {
 
     public static void runThrowableScript(String[] args, Source source, OutputStream out, OutputStream err) {
@@ -50,6 +56,15 @@ public class RunScript {
                 interp.execfile(source, null, out, err);
             } catch (Throwable t) {
                 ZipPyConsole.dispose(interp, t, false);
+            } finally {
+                if (!PythonOptions.MGOff) {
+                    if ((MGOptions.Log.Summary))
+                        MGLog.printSummary();
+                    if ((MGOptions.Log.NodeProfileJSON))
+                        ParallelNodeProfile.profilesSummary();
+
+                    OpenCLExecuter.cleanUp(false);
+                }
             }
         }
     }

@@ -30,8 +30,13 @@ import com.oracle.truffle.api.dsl.GenerateNodeFactory;
 import com.oracle.truffle.api.dsl.NodeFactory;
 import com.oracle.truffle.api.dsl.Specialization;
 
+import edu.uci.megaguards.analysis.exception.MGException;
+import edu.uci.megaguards.backend.MGReduce;
+import edu.uci.megaguards.python.ast.MGPythonTree;
+import edu.uci.megaguards.python.fallback.ReduceFallback;
 import edu.uci.python.builtins.Builtin;
 import edu.uci.python.builtins.PythonBuiltins;
+import edu.uci.python.builtins.module.FunctoolsModuleBuiltinsFactory.ReduceNodeFactory;
 import edu.uci.python.nodes.PNode;
 import edu.uci.python.nodes.function.PythonBuiltinNode;
 import edu.uci.python.runtime.datatype.PIterable;
@@ -59,10 +64,69 @@ public class FunctoolsModuleBuiltins extends PythonBuiltins {
     @GenerateNodeFactory
     public abstract static class ReduceNode extends PythonBuiltinNode {
 
+        @Child protected MGReduce<PNode, PFunction> MGreduce;
+
+        public ReduceNode() {
+            this.MGreduce = new MGReduce.Uninitialized<>(MGPythonTree.PyTREE, new ReduceFallback());
+        }
+
+        public ReduceNode(MGReduce<PNode, PFunction> MGreduce) {
+            this.MGreduce = MGreduce;
+        }
+
         public abstract PNode[] getArguments();
 
+        @Specialization(guards = "isOptimized()", rewriteOn = MGException.class)
+        public Object reduceFunctionIterableMGOpt(PFunction function, PList iterable, PythonBuiltinObject initializer) {
+            Object ret = MGreduce.reduce(function, iterable, initializer, !(initializer instanceof PNone), iterable.len());
+            return ret;
+        }
+
+        @Specialization(guards = "isRetry(function)", rewriteOn = MGException.class)
+        public Object reduceFunctionIterableReOpt(PFunction function, PList iterable, PythonBuiltinObject initializer) {
+            Object ret = MGreduce.reduce(getSourceSection(), function, function.getFrameDescriptor(), iterable, initializer, !(initializer instanceof PNone), iterable.len());
+            replace(ReduceNodeFactory.create(MGreduce, getArguments(), getContext()), "MegaGuards Opt");
+            return ret;
+        }
+
+        @Specialization(guards = "isFailed(function)")
+        public Object reduceFunctionIterable(PFunction function, PList iterable, PythonBuiltinObject initializer) {
+            PIterator iter = iterable.__iter__();
+            Object init = (initializer instanceof PNone) ? iter.__next__() : initializer;
+            return doReduce(function, iter, init);
+        }
+
         @Specialization
+        public Object reduceFunctionIterableRetry(PFunction function, PList iterable, PythonBuiltinObject initializer) {
+            replace(ReduceNodeFactory.create(new MGReduce.Uninitialized<>(MGreduce), getArguments(), getContext()), "MegaGuards Opt");
+            PIterator iter = iterable.__iter__();
+            Object init = (initializer instanceof PNone) ? iter.__next__() : initializer;
+            return doReduce(function, iter, init);
+        }
+
+        @Specialization(guards = "isOptimized()", rewriteOn = MGException.class)
+        public Object reduceFunctionIterableMGOpt(PFunction function, PList iterable, Object initializer) {
+            Object ret = MGreduce.reduce(function, iterable, initializer, !(initializer instanceof PNone), iterable.len());
+            return ret;
+        }
+
+        @Specialization(guards = "isRetry(function)", rewriteOn = MGException.class)
+        public Object reduceFunctionIterableReOpt(PFunction function, PList iterable, Object initializer) {
+            Object ret = MGreduce.reduce(getSourceSection(), function, function.getFrameDescriptor(), iterable, initializer, !(initializer instanceof PNone), iterable.len());
+            replace(ReduceNodeFactory.create(MGreduce, getArguments(), getContext()), "MegaGuards Opt");
+            return ret;
+        }
+
+        @Specialization(guards = "isFailed(function)")
         public Object reduceFunctionIterable(PFunction function, PList iterable, Object initializer) {
+            PIterator iter = iterable.__iter__();
+            Object init = (initializer instanceof PNone) ? iter.__next__() : initializer;
+            return doReduce(function, iter, init);
+        }
+
+        @Specialization
+        public Object reduceFunctionIterableRetry(PFunction function, PList iterable, Object initializer) {
+            replace(ReduceNodeFactory.create(new MGReduce.Uninitialized<>(MGreduce), getArguments(), getContext()), "MegaGuards Opt");
             PIterator iter = iterable.__iter__();
             Object init = (initializer instanceof PNone) ? iter.__next__() : initializer;
             return doReduce(function, iter, init);
@@ -107,6 +171,22 @@ public class FunctoolsModuleBuiltins extends PythonBuiltins {
         public Object reduceSequence(Object function, Object iterable, Object initializer) {
             throw new RuntimeException(String.format("reduce is not supported for %s %s iterable %s %s initializer %s %s",
                             function, function.getClass(), iterable, iterable.getClass(), initializer, initializer.getClass()));
+        }
+
+        public boolean preCheck(PFunction function) {
+            return ((ReduceFallback) MGreduce.getFallback()).check(function);
+        }
+
+        public boolean isOptimized() {
+            return !MGreduce.isUninitialized();
+        }
+
+        public boolean isRetry(PFunction function) {
+            return !isOptimized() && preCheck(function);
+        }
+
+        public boolean isFailed(PFunction function) {
+            return !isOptimized() && !preCheck(function);
         }
 
     }

@@ -87,6 +87,9 @@ public class PythonOptions {
 
     public static boolean forceLongType = Boolean.getBoolean(propPkgName + ".forceLongType"); // false
 
+    // MG
+    public static boolean MGOff = !Boolean.getBoolean(propPkgName + ".enableMG"); // false
+
     private OutputStream standardOut = System.out;
 
     private OutputStream standardErr = System.err;

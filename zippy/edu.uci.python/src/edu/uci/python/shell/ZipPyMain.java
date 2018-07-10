@@ -35,6 +35,8 @@ import org.python.core.util.RelativeFile;
 import org.python.modules.posix.PosixModule;
 import org.python.util.InteractiveConsole;
 
+import edu.uci.megaguards.python.MGPythonInit;
+
 public class ZipPyMain {
 
     public static void main(String[] args) {
@@ -76,7 +78,10 @@ public class ZipPyMain {
                     }
                 } catch (Throwable t) {
                     ZipPyConsole.dispose(interp, t, true);
+                } finally {
+                    MGPythonInit.INSTANCE.MGfinalize();
                 }
+
             }
         }
     }

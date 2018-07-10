@@ -38,6 +38,11 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 
+import edu.uci.megaguards.analysis.exception.MGException;
+import edu.uci.megaguards.backend.MGMap;
+import edu.uci.megaguards.python.ast.MGPythonTree;
+import edu.uci.megaguards.python.fallback.MapFallback;
+import edu.uci.python.builtins.BuiltinConstructorsFactory.MapNodeFactory;
 import edu.uci.python.nodes.EmptyNode;
 import edu.uci.python.nodes.PNode;
 import edu.uci.python.nodes.control.GetIteratorNode;
@@ -54,6 +59,7 @@ import edu.uci.python.runtime.datatype.PNone;
 import edu.uci.python.runtime.datatype.PRange;
 import edu.uci.python.runtime.exception.StopIterationException;
 import edu.uci.python.runtime.function.PArguments;
+import edu.uci.python.runtime.function.PFunction;
 import edu.uci.python.runtime.function.PythonCallable;
 import edu.uci.python.runtime.iterator.PIterator;
 import edu.uci.python.runtime.iterator.PStringIterator;
@@ -407,6 +413,16 @@ public final class BuiltinConstructors extends PythonBuiltins {
     @GenerateNodeFactory
     public abstract static class MapNode extends PythonBuiltinNode {
 
+        @Child private MGMap<PNode, PFunction> MGmap;
+
+        public MapNode() {
+            this.MGmap = new MGMap.Uninitialized<>(MGPythonTree.PyTREE, new MapFallback());
+        }
+
+        public MapNode(MGMap<PNode, PFunction> MGmap) {
+            this.MGmap = MGmap;
+        }
+
         public abstract PNode[] getArguments();
 
         @Specialization
@@ -444,6 +460,28 @@ public final class BuiltinConstructors extends PythonBuiltins {
             return list;
         }
 
+        @Specialization(guards = "isOptimized()", rewriteOn = MGException.class)
+        public Object mapFunctionIterableMGOpt(PFunction function, PList iterable, PTuple iterators) {
+            return MGmap.map(function, iterable.len(), iterable, iterators.getArray());
+        }
+
+        @Specialization(guards = "isRetry(function)", rewriteOn = MGException.class)
+        public Object mapFunctionIterableReOpt(PFunction function, PList iterable, PTuple iterators) {
+            Object ret = MGmap.map(getSourceSection(), function, function.getFrameDescriptor(), iterable.len(), iterable, iterators.getArray());
+            replace(MapNodeFactory.create(MGmap, getArguments(), getContext()), "MegaGuards Opt");
+            return ret;
+        }
+
+        @Specialization(guards = "isFailed(function)")
+        public Object mapFunctionIterable(PFunction function, PList iterable, PTuple iterators) {
+            return doMap(function, iterable.__iter__(), iterators);
+        }
+
+        @Specialization
+        public Object mapFunctionIterableRetry(PFunction function, PList iterable, PTuple iterators) {
+            return replace(MapNodeFactory.create(new MGMap.Uninitialized<>(MGmap), getArguments(), getContext()), "MegaGuards Opt").mapFunctionIterableReOpt(function, iterable, iterators);
+        }
+
         @Specialization
         public Object mapFunctionIterable(PythonCallable function, PIterable iterable, PTuple iterators) {
             return doMap(function, iterable.__iter__(), iterators);
@@ -478,6 +516,23 @@ public final class BuiltinConstructors extends PythonBuiltins {
         public Object mapSequence(Object function, Object iterable, PTuple iterators) {
             throw new RuntimeException("map is not supported for " + function + " " + function.getClass() + " iterable " + iterable + " " + iterable.getClass());
         }
+
+        public boolean preCheck(PFunction function) {
+            return ((MapFallback) MGmap.getFallback()).check(function);
+        }
+
+        public boolean isOptimized() {
+            return !MGmap.isUninitialized();
+        }
+
+        public boolean isRetry(PFunction function) {
+            return !isOptimized() && preCheck(function);
+        }
+
+        public boolean isFailed(PFunction function) {
+            return !isOptimized() && !preCheck(function);
+        }
+
     }
 
     // object()

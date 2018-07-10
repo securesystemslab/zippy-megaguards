@@ -1,5 +1,6 @@
 package edu.uci.python.ast;
 
+import edu.uci.megaguards.python.node.MGForNode;
 import edu.uci.python.nodes.EmptyNode;
 import edu.uci.python.nodes.NoneNode;
 import edu.uci.python.nodes.argument.ArgumentsNode;
@@ -103,6 +104,8 @@ public interface VisitorIF<T> {
     public T visitBreakTargetNode(BreakTargetNode node) throws Exception;
 
     public T visitForNode(ForNode node) throws Exception;
+
+    public T visitMGForNode(MGForNode node) throws Exception;
 
     public T visitElseNode(ElseNode node) throws Exception;
 

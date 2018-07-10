@@ -1010,6 +1010,12 @@ public class PythonTreeTranslator extends Visitor {
         return createForNode(node, iteratorWrite, iter, bodyPart, orelsePart, loops.endLoop());
     }
 
+    private LoopNode createMGForNode(PNode target, PNode iterator, PNode body) {
+        GetIteratorNode getIterator = factory.createGetIterator(iterator);
+        getIterator.assignSourceSection(iterator.getSourceSection());
+        return edu.uci.megaguards.python.node.MGForNodeFactory.create(body, target, getIterator);
+    }
+
     private StatementNode createForNode(For node, PNode target, PNode iter, PNode body, PNode orelse, LoopInfo info) {
         List<stmt> bodyStmt = node.getInternalBody();
         PNode wrappedBody = body;
@@ -1018,7 +1024,13 @@ public class PythonTreeTranslator extends Visitor {
         }
 
         assignSourceToBlockNode(wrappedBody, bodyStmt);
-        StatementNode forNode = createForInScope(target, iter, wrappedBody);
+        StatementNode forNode;
+
+        if (PythonOptions.MGOff) {
+            forNode = createForInScope(target, iter, wrappedBody);
+        } else {
+            forNode = createMGForNode(target, iter, wrappedBody);
+        }
         assignSourceFromNode(node, forNode);
 
         if (!EmptyNode.isEmpty(orelse)) {

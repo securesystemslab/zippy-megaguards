@@ -45,6 +45,8 @@ import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.source.Source;
 
+import edu.uci.megaguards.MGOptions;
+import edu.uci.megaguards.python.MGPythonInit;
 import edu.uci.python.PythonLanguage;
 import edu.uci.python.builtins.PythonDefaultBuiltinsLookup;
 import edu.uci.python.nodes.ModuleNode;
@@ -166,7 +168,8 @@ public class ZipPyConsole extends InteractiveConsole {
     }
 
     private static PySystemState createPySystemState(String[] args) {
-        String[] argsFiltered = args;
+        String[] argsFiltered = MGOptions.processMGOptions(args);
+        MGPythonInit.INSTANCE.MGInitialization();
 
         // Setup the basic python system state from these options
         PySystemState systemState = null;
