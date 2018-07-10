@@ -1,65 +1,141 @@
 ![zippy-logo-200-rounded.jpg](http://ssllab.org/zippy_logo.jpeg)
-# ZipPy [![Build Status](https://travis-ci.org/securesystemslab/zippy.svg?branch=master)](https://travis-ci.org/securesystemslab/zippy) #
+# ZipPy+MegaGuards #
 
-|                 | Standard JVM  | Graal JVM   |
-| :------------------: |:-------------:| :----------:|
-| Linux Ubuntu 14.04.5  | [![Build Status](https://badges.herokuapp.com/travis/securesystemslab/zippy?env=ZIPPY_JDK_TYPE=STANDARD_LINUX&label=Standard%20JVM)](https://travis-ci.org/securesystemslab/zippy)  | [![Build Status](https://badges.herokuapp.com/travis/securesystemslab/zippy?env=ZIPPY_JDK_TYPE=GRAALJVM_LINUX&label=Graal%20JVM)](https://travis-ci.org/securesystemslab/zippy) |
-| Mac OSX 10.12 | [![Build Status](https://badges.herokuapp.com/travis/securesystemslab/zippy?env=ZIPPY_JDK_TYPE=STANDARD_OSX&label=Standard%20JVM)](https://travis-ci.org/securesystemslab/zippy)  | [![Build Status](https://badges.herokuapp.com/travis/securesystemslab/zippy?env=ZIPPY_JDK_TYPE=GRAALJVM_OSX&label=Graal%20JVM)](https://travis-ci.org/securesystemslab/zippy) |
+### ZipPy ###
 
-ZipPy is a fast and lightweight [Python 3](https://www.python.org/) implementation built using the [Truffle](http://openjdk.java.net/projects/graal/) framework. ZipPy leverages the underlying Java JIT compiler and compiles Python programs to highly optimized machine code at runtime.
+|                 | Graal CE JVM   |
+| :------------------: |:-------------:|
+| Linux Ubuntu 16.04  | [![Build Status](https://badges.herokuapp.com/travis/securesystemslab/zippy-megaguards?env=ZIPPY_JDK_TYPE=GRAALJVM_LINUX&label=Graal%20JVM)](https://travis-ci.org/securesystemslab/zippy-megaguards)
 
-ZipPy is currently maintained by [Secure Systems and Software Laboratory](https://ssllab.org) at the ​[University of California, Irvine](http://www.uci.edu/).
+> These builds are without MegaGuards since Travis CI does not support GPU testing
 
-### Short instructions (Using Standard JDK):
+ZipPy is a fast and lightweight [Python 3](https://www.python.org/) implementation built using the
+[Truffle](http://openjdk.java.net/projects/graal/) framework. ZipPy leverages the underlying Java JIT compiler and compiles Python programs to highly optimized machine code at runtime.
 
-##### Prerequisites:
+ZipPy is currently maintained by [Secure Systems and Software Laboratory](http://ssllab.org) at the ​[University of California, Irvine](http://www.uci.edu/).
 
-1. Install the most recent [JDK 8](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html)
+### MegaGuards ###
 
-#### Getting ZipPy:
 
-1. Create a working directory ($ZIPPY_HOME)
-2. Clone mxtool:
+MegaGuards is a guards optimization and transparent heterogenous computing system that built on top of
+[Truffle](https://github.com/oracle/graal) framework. MegaGuards analyze and execute AST on Truffle
+and OpenCL. Currently, *MegaGuards works only on Linux x86 64-Bit and has been tested on Ubuntu x86 64-Bit 16.04.*
 
-        $ cd $ZIPPY_HOME
+
+MegaGuards is currently maintained by [Secure Systems and Software Laboratory](http://ssllab.org) at the ​[University of California, Irvine](http://www.uci.edu/).
+
+## Getting ZipPy+MegaGuards for Ubuntu 16.04 x86 64-Bit:
+
+### Option 1: Using our interactive script (using `curl`, to install `sudo apt-get install curl`):
+
+        $ mkdir megaguards && cd megaguards
+        $ python -c "$(curl -fsSL https://raw.github.com/securesystemslab/zippy-megaguards/getting-zippy-megaguards.py)"
+
+> Some prerequisites require `sudo` privilege to be installed.
+
+### Option 2: Manually:
+
+1. Create a working directory (`$MEGAGUARDS_ROOT`)
+
+        $ mkdir megaguards && cd megaguards
+        $ export MEGAGUARDS_ROOT=$PWD
+
+2. Download [JDK with JVMCI 8 v0.46](http://www.oracle.com/technetwork/oracle-labs/program-languages/downloads/index.html) and decompress it.
+
+        $ tar -xzf labsjdk-8u172-jvmci-0.46-linux-amd64.tar.gz
+
+3. Install system dependencies:
+
+        $ sudo apt-get install build-essential
+        $ sudo apt-get install git wget curl
+        $ sudo apt-get install ocl-icd-opencl-dev clinfo
+
+4. Install GPU and/or CPU drivers (that includes OpenCL icd) from the appropriate vendor based on your system specs.
+
+  - NVIDIA:
+
+        https://www.geforce.com/drivers
+
+        OR
+
+            $ sudo add-apt-repository ppa:graphics-drivers
+            $ sudo apt-get update
+            $ sudo apt-get install nvidia-390
+
+  - AMD:
+
+        https://support.amd.com/en-us/download
+
+  - Intel:
+
+        https://software.intel.com/en-us/articles/opencl-drivers
+
+7. Clone mxtool:
+
+        $ cd $MEGAGUARDS_ROOT
         $ git clone https://github.com/graalvm/mx.git
 
-3. Append the `mx` build tool directory to your `PATH`.
+8. Append the `mx` build tool directory to your `PATH`.
 
-        $ export PATH=$ZIPPY_HOME/mx:$PATH
+        $ export PATH=$MEGAGUARDS_ROOT/mx:$PATH
 
-4. Clone ZipPy:
+9. Clone ZipPy+MegaGuards:
 
-        $ git clone https://github.com/securesystemslab/zippy.git
+        $ git clone https://github.com/securesystemslab/zippy-megaguards.git
 
-5. Get all ZipPy's dependencies:
+10. Create a file `$MEGAGUARDS_ROOT/zippy-megaguards/mx.zippy/env` and add JDK path
 
-        $ cd $ZIPPY_HOME/zippy
-        $ mx spull
-
-6. Create a file `$ZIPPY_HOME/zippy/mx.zippy/env` and add JDK path
-
-        JAVA_HOME=/path/to/jdk8
+        JAVA_HOME=/path/to/labsjdk1.8.0_172-jvmci-0.46 ## replace path with correct one. ##
         DEFAULT_VM=server
+        DEFAULT_DYNAMIC_IMPORTS=truffle/compiler
+        ZIPPY_MUST_USE_GRAAL=1
 
-> For instructions on [using Graal JVM (recommended)](https://github.com/securesystemslab/zippy/tree/master/doc/graal.md).
 
 > For more information please visit the [ZipPy Wiki](https://github.com/securesystemslab/zippy/wiki).
 
 
 ### Build:
 
-    $ cd $ZIPPY_HOME/zippy
+    $ cd $MEGAGUARDS_ROOT/zippy-megaguards
     $ mx build
 
-### Run:
+### Check hardware and system compatibility:
 
-    $ cd $ZIPPY_HOME/zippy
-    $ mx python <file.py>
+    $ cd $MEGAGUARDS_ROOT/zippy-megaguards
+    $ mx mg --init
+    $ mx mg --clinfo
+
+
+Please try to solve any `error` that our check script encounter.
+
+### Test all the installed tools:
+
+    $ mx mg --simple-example
+
+
+### Run a Python program:
+
+To enable MegaGuards use:
+
+`--mg-target=truffle` to execute using a guardless Truffle AST on Graal.
+
+`--mg-target=gpu` to execute on a GPU OpenCL device.
+
+`--mg-target=cpu` to execute on a CPU OpenCL device.
+
+`--mg-target` to execute using our adaptive OpenCL device selection.
+
+    $ cd $MEGAGUARDS_ROOT/zippy-megaguards
+    $ mx python <file.py> --mg-target=gpu
 
 ### Test:
 
-    $ cd $ZIPPY_HOME/zippy
+    $ cd $MEGAGUARDS_ROOT/zippy-megaguards
     $ mx junit
+    $ mx junit-mg
 
-For more details and instructions for downloading and building the system, please visit the [ZipPy Wiki](https://github.com/securesystemslab/zippy/wiki).
+
+### Notes:
+
+- ZipPy is still under development and not all language features are available.
+- ZipPy require few runs to reach optimal performance results.
