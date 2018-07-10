@@ -1,8 +1,32 @@
+# Copyright (c) 2018, Regents of the University of California
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 from argparse import ArgumentParser
 from argparse import RawTextHelpFormatter
 import traceback
 import json
 import time
+import sys
 import re
 import os
 import copy
@@ -13,6 +37,7 @@ import mx
 import mx_benchmark
 
 from mx_zippy_bench_param import benchmarks_list
+from mx_zippy_tools import print_wait, print_ok, print_progress, print_error, print_warn, print_info, print_status
 
 # mx asv-benchmark "asv-zippy-normal:*"
 # mx asv-benchmark "asv-pypy3-normal:*"
@@ -21,7 +46,7 @@ from mx_zippy_bench_param import benchmarks_list
 # mx asv-benchmark --generate-asv-conf
 # ...
 
-_mx_graal = mx.suite("graal-core", fatalIfMissing=False)
+_mx_graal = mx.suite("compiler", fatalIfMissing=False)
 _suite = mx.suite('zippy')
 asv_env = os.environ.get("ZIPPY_ASV_PATH")
 if not asv_env:
@@ -304,7 +329,7 @@ class ASVBenchmarkExecutor(mx_benchmark.BenchmarkExecutor):
                         write_to_json(last_result, machine_results_dir + "/" + file_tag + t + run_num + ".json")
                         self.repeat_count -= 1
 
-                    mx.warn("Copied {0}/{1}".format(c, count))
+                    print_info("Copied {0}/{1}".format(c, count))
             except:
                 return 1
 
@@ -339,6 +364,15 @@ class ASVBenchmarkExecutor(mx_benchmark.BenchmarkExecutor):
             "--repeat", nargs="?", default=None,
             help="Repeat action <number> of times")
         parser.add_argument(
+            "--smallest", action="store_true", default=None,
+            help="Benchmark using the smallest parameters.")
+        parser.add_argument(
+            "--largest", action="store_true", default=None,
+            help="Benchmark using the largest parameters.")
+        parser.add_argument(
+            "--avoid-failed-dd", action="store_true", default=None,
+            help="Avoid failed data dependence benchmarks.")
+        parser.add_argument(
             "-h", "--help", action="store_true", default=None,
             help="Show usage information.")
         mxASVBenchmarkArgs = parser.parse_args(mxASVBenchmarkArgs)
@@ -366,7 +400,7 @@ class ASVBenchmarkExecutor(mx_benchmark.BenchmarkExecutor):
             mx.abort("")
 
         if mxASVBenchmarkArgs.list:
-            print "The following benchmark suites are available:\n"
+            print_info("The following benchmark suites are available:\n")
             for name in sorted(mx_benchmark._bm_suites):
                 if mx_benchmark._bm_suites[name].group() == "zippy":
                     print "  " + name
@@ -383,6 +417,41 @@ class ASVBenchmarkExecutor(mx_benchmark.BenchmarkExecutor):
         if mxASVBenchmarkArgs.benchmark:
             suite, benchNamesList = self.getSuiteAndBenchNames(mxASVBenchmarkArgs, bmSuiteArgs)
 
+        if mxASVBenchmarkArgs.avoid_failed_dd:
+            dd_benchList = []
+            for b in benchNamesList:
+                dd_benchList += [b]
+
+            benchNamesList = dd_benchList
+
+        if mxASVBenchmarkArgs.smallest:
+            smallest_benchList = []
+            seen = ''
+            for b in benchNamesList:
+                if b[0][0] != seen:
+                    smallest_benchList += [b]
+                    seen = b[0][0]
+            benchNamesList = smallest_benchList
+
+        if mxASVBenchmarkArgs.largest:
+            largest_benchList = []
+            seen = ''
+            largest_benchList_tmp = []
+            for b in benchNamesList:
+                if seen == '':
+                    seen = b[0][0]
+                if b[0][0] == seen:
+                    largest_benchList_tmp += [b]
+                    seen = b[0][0]
+                else:
+                    largest_benchList += [largest_benchList_tmp[-1]]
+                    largest_benchList_tmp = []
+                    largest_benchList_tmp += [b]
+                    seen = b[0][0]
+
+            largest_benchList += [largest_benchList_tmp[-1]]
+            benchNamesList = largest_benchList
+
         self.checkEnvironmentVars()
 
         results = []
@@ -396,9 +465,10 @@ class ASVBenchmarkExecutor(mx_benchmark.BenchmarkExecutor):
 
         failures_seen = False
         for c in range(self.repeat_count):
-            mx.warn("Run {0}/{1}".format(c, self.repeat_count))
-            suite.before(bmSuiteArgs)
+            print_info("Run {0}/{1}".format(c+1, self.repeat_count))
+
             for benchnames in benchNamesList:
+                suite.before(bmSuiteArgs)
                 suite.validateEnvironment()
                 try:
                     run = 5 # number of retries
@@ -412,11 +482,8 @@ class ASVBenchmarkExecutor(mx_benchmark.BenchmarkExecutor):
                         except RuntimeError:
                             if i+1 == run:
                                 raise
-                            mx.warn("Benchmark '{0}' FAILED.. Retrying again {1}/{2}".format(benchnames[0][0], i+1, run))
-                            for i in range(wait_time,0,-1):
-                                mx.warn('Sleeping for {0} seconds\r'.format(i))
-                                time.sleep(1)
-
+                            print_progress("Benchmark '{0}' Crashed.. Retrying again {1}/{2}".format(benchnames[0][0], i+1, run))
+                            print_wait(wait_time)
 
                 except RuntimeError:
                     failures_seen = True
@@ -427,11 +494,16 @@ class ASVBenchmarkExecutor(mx_benchmark.BenchmarkExecutor):
                     for t in suite.get_timing():
                         failedResults[t] = None
                     self.process_result(suite, failedResults)
+                    print_error("%s  %s  Failed!" % (suite.benchmarksType(), benchnames[0][0]))
                     mx.log(traceback.format_exc())
-            suite.after(bmSuiteArgs)
+                suite.after(bmSuiteArgs)
 
             self.write_asv_results(suite, self.asv_pre_results)
             self.asv_pre_results = {} # clean up for the next round
+            print_info("Run {0}/{1} complete.".format(c+1, self.repeat_count))
+            if (c+1) != self.repeat_count:
+                print_wait(30)
+
 
         if failures_seen:
             return 1

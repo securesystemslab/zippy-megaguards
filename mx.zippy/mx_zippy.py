@@ -16,9 +16,10 @@ import mx_zippy_benchmark_asv
 import mx_zippy_asv_chart
 import mx_zippy_junit
 
+import mx_mg_junit
 
 _suite = mx.suite('zippy')
-_mx_graal = mx.suite("compiler", fatalIfMissing=False)
+_mx_graal = mx.suite("compiler", fatalIfMissing=True)
 
 def check_vm(vm_warning=True, must_be_jvmci=False):
     if not _mx_graal:
