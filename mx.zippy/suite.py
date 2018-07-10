@@ -14,6 +14,15 @@ suite = {
                 ]
             },
 
+            {
+               "name" : "megaguards",
+               "subdir" : False,
+               "version" : "1d822342eb9774b19154df7d345d5a0dcc6d7898",
+               "urls" : [
+                    {"url" : "git@github.com:securesystemslab/megaguards.git", "kind" : "git"},
+                ]
+            },
+
         ],
    },
 
